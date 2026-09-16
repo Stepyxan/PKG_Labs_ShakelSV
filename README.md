@@ -1,2 +1,4 @@
 # PKG_Labs
-Repository of laboratory solutions on PKG
+PKG Laboratory Solutions Repository
+
+Lab1 hosted resource: https://tourmaline-sprinkles-e08cf9.netlify.app/
