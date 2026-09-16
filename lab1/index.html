@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XYZ ↔ LAB ↔ HLS Converter</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="main-title">XYZ ↔ LAB ↔ HLS Converter</h1>
+
+        <div class="top-layout">
+            <div class="settings-panel">
+                <div class="setting-item">
+                    <label for="illuminant-select">Источник света:</label>
+                    <select id="illuminant-select">
+                        <option value="D65">D65 (Дневной свет, sRGB)</option>
+                        <option value="D50">D50 (Полиграфия, теплый)</option>
+                        <option value="E">E (Равноэнергетический)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="gamut-select">Вне диапазона sRGB:</label>
+                    <select id="gamut-select">
+                        <option value="clipping">Clipping (Обрезание)</option>
+                        <option value="scaling">Scaling (Масштабирование)</option>
+                    </select>
+                </div>
+                <div class="palette-btn-wrapper">
+                    <button class="btn" type="button">Открыть системную палитру</button>
+                    <input type="color" id="color-picker" value="#3b82f6">
+                </div>
+            </div>
+
+            <div class="preview-area">
+                <div id="preview" class="preview-box"></div>
+            </div>
+        </div>
+
+        <div id="warning" class="warning-msg">
+            Цвет выходит за рамки охвата sRGB и подвергается обработке.
+        </div>
+
+        <div class="controls-grid">
+            <div class="model-column">
+                <h2 class="section-title">XYZ</h2>
+                <div class="channel-block">
+                    <div class="label-row"><label>X</label><input type="number" id="x-num" step="0.001"></div>
+                    <input type="range" id="x-slide" min="0" max="120000" value="95047">
+                </div>
+                <div class="channel-block">
+                    <div class="label-row"><label>Y</label><input type="number" id="y-num" step="0.001"></div>
+                    <input type="range" id="y-slide" min="0" max="120000" value="100000">
+                </div>
+                <div class="channel-block">
+                    <div class="label-row"><label>Z</label><input type="number" id="z-num" step="0.001"></div>
+                    <input type="range" id="z-slide" min="0" max="130000" value="108883">
+                </div>
+            </div>
+
+            <div class="model-column">
+                <h2 class="section-title">LAB</h2>
+                <div class="channel-block">
+                    <div class="label-row"><label>L</label><input type="number" id="l-num" step="0.001"></div>
+                    <input type="range" id="l-slide" min="0" max="100000" value="100000">
+                </div>
+                <div class="channel-block">
+                    <div class="label-row"><label>a</label><input type="number" id="a-num" step="0.001"></div>
+                    <input type="range" id="a-slide" min="-128000" max="128000" value="0">
+                </div>
+                <div class="channel-block">
+                    <div class="label-row"><label>b</label><input type="number" id="b-num" step="0.001"></div>
+                    <input type="range" id="b-slide" min="-128000" max="128000" value="0">
+                </div>
+            </div>
+
+            <div class="model-column">
+                <h2 class="section-title">HLS</h2>
+                <div class="channel-block">
+                    <div class="label-row"><label>H</label><input type="number" id="h-num" step="0.001"></div>
+                    <input type="range" id="h-slide" min="0" max="360000" value="0">
+                </div>
+                <div class="channel-block">
+                    <div class="label-row"><label>L</label><input type="number" id="hlsl-num" step="0.001"></div>
+                    <input type="range" id="hlsl-slide" min="0" max="100000" value="50000">
+                </div>
+                <div class="channel-block">
+                    <div class="label-row"><label>S</label><input type="number" id="s-num" step="0.001"></div>
+                    <input type="range" id="s-slide" min="0" max="100000" value="100000">
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="model.js"></script>
+    <script src="controller.js"></script>
+    <script src="test.js"></script>
+</body>
+</html>
