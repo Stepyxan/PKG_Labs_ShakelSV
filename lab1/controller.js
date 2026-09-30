@@ -15,7 +15,7 @@ class ColorView {
     static getValues(keys, isSlider) {
         return keys.map(k => {
             const id = this.inputMap[k][isSlider ? 1 : 0];
-            return parseFloat(document.getElementById(id).value) / (isSlider ? 1000 : 1) || 0;
+            return parseFloat(document.getElementById(id).value) || 0;
         });
     }
 
@@ -27,9 +27,11 @@ class ColorView {
         const hex = "#" + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
         document.getElementById('color-picker').value = hex;
 
+        // Дробные числа округляются до целых только при выводе на экран
         const set = (keys, data) => keys.forEach((k, i) => {
-            document.getElementById(this.inputMap[k][0]).value = data[i].toFixed(3);
-            document.getElementById(this.inputMap[k][1]).value = Math.round(data[i] * 1000);
+            const roundedValue = Math.round(data[i]);
+            document.getElementById(this.inputMap[k][0]).value = roundedValue;
+            document.getElementById(this.inputMap[k][1]).value = roundedValue;
         });
 
         set(['X', 'Y', 'Z'], xyz);
