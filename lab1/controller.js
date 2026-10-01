@@ -22,16 +22,22 @@ class ColorView {
     static updateInterface(xyz, lab, hls, rgb, outOfBounds) {
         document.getElementById('warning').style.display = outOfBounds ? 'block' : 'none';
 
-        let [r, g, b] = rgb.map(x => Math.round(x));
+        let [r, g, b] = rgb.map(x => Math.max(0, Math.min(255, Math.round(x))));
         document.getElementById('preview').style.backgroundColor = `rgb(${r},${g},${b})`;
         const hex = "#" + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
         document.getElementById('color-picker').value = hex;
-
-        // Дробные числа округляются до целых только при выводе на экран
         const set = (keys, data) => keys.forEach((k, i) => {
             const roundedValue = Math.round(data[i]);
-            document.getElementById(this.inputMap[k][0]).value = roundedValue;
-            document.getElementById(this.inputMap[k][1]).value = roundedValue;
+            
+            const numId = this.inputMap[k][0];
+            const slideId = this.inputMap[k][1];
+
+            if (document.activeElement.id !== numId) {
+                document.getElementById(numId).value = roundedValue;
+            }
+            if (document.activeElement.id !== slideId) {
+                document.getElementById(slideId).value = roundedValue;
+            }
         });
 
         set(['X', 'Y', 'Z'], xyz);
@@ -56,18 +62,18 @@ class ColorController {
         this.syncFromXyz([95.047, 100, 108.883], true);
     }
 
-    syncFromXyz(xyz, forceUpdate = false, keepH = false) {
+    syncFromXyz(xyz, forceUpdate = false) {
         if (this.isUpdating && !forceUpdate) return;
         this.isUpdating = true;
 
         const { illuminant, strategy } = ColorView.getSelectedSettings();
-
         const [r, g, b, warn] = ColorModel.xyzToRgb(...xyz, illuminant, strategy);
         const lab = ColorModel.xyzToLab(...xyz, illuminant);
+        const [r_raw, g_raw, b_raw] = ColorModel.xyzToRgbUnclamped(...xyz, illuminant);
 
         const oldH = parseFloat(document.getElementById('h-num').value) || 0;
-        const hls = ColorModel.rgbToHls(r, g, b, keepH ? oldH : 0);
-
+        
+        const hls = ColorModel.rgbToHls(r_raw, g_raw, b_raw, oldH);
         ColorView.updateInterface(xyz, lab, hls, [r, g, b], warn);
 
         this.isUpdating = false;

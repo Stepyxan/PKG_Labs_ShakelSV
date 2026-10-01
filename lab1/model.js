@@ -55,8 +55,8 @@ class ColorModel {
         return { toXyz, toRgb };
     }
 
-    static f = x => (x >= 0.008856) ? Math.pow(x, 1/3) : 7.787 * x + 16 / 116;
-    static fInv = x => (x >= 0.008856) ? Math.pow(x, 3) : (x - 16 / 116) / 7.787;
+    static f = x => (x > 0.00885645) ? Math.pow(x, 1/3) : 7.787037 * x + 16 / 116;
+    static fInv = x => (x > 6 / 29) ? Math.pow(x, 3) : (x - 16 / 116) * (108 / 841);
 
     static labToXyz(l, a, b, illKey) {
         const [Xw, Yw, Zw] = this.ILLUMINANTS[illKey];
@@ -78,26 +78,42 @@ class ColorModel {
         let g_l = matrices.toRgb[1][0]*X + matrices.toRgb[1][1]*Y + matrices.toRgb[1][2]*Z;
         let b_l = matrices.toRgb[2][0]*X + matrices.toRgb[2][1]*Y + matrices.toRgb[2][2]*Z;
 
-        const gamma = v => (v >= 0.0031308) ? (1.055 * Math.pow(v, 1/2.4) - 0.055) : (12.92 * v);
-        let r = gamma(r_l), g = gamma(g_l), b = gamma(b_l);
-
-        const eps = 0.03;
-        const outOfBounds = (r < -eps || r > 1 + eps || g < -eps || g > 1 + eps || b < -eps || b > 1 + eps);
+        const eps = 0.01;
+        const outOfBounds = (r_l < -eps || r_l > 1 + eps || g_l < -eps || g_l > 1 + eps || b_l < -eps || b_l > 1 + eps);
 
         if (strategy === 'scaling' && outOfBounds) {
-            const minVal = Math.min(r, g, b, 0);
-            const maxVal = Math.max(r, g, b, 1);
+            const minVal = Math.min(r_l, g_l, b_l, 0);
+            const maxVal = Math.max(r_l, g_l, b_l, 1);
             const range = maxVal - minVal;
-            r = (r - minVal) / range;
-            g = (g - minVal) / range;
-            b = (b - minVal) / range;
+            r_l = (r_l - minVal) / range;
+            g_l = (g_l - minVal) / range;
+            b_l = (b_l - minVal) / range;
         } else {
-            r = Math.max(0, Math.min(1, r));
-            g = Math.max(0, Math.min(1, g));
-            b = Math.max(0, Math.min(1, b));
+            r_l = Math.max(0, Math.min(1, r_l));
+            g_l = Math.max(0, Math.min(1, g_l));
+            b_l = Math.max(0, Math.min(1, b_l));
         }
 
+        const gamma = v => (v >= 0.0031308) ? (1.055 * Math.pow(v, 1/2.4) - 0.055) : (12.92 * v);
+        let r = gamma(r_l), g = gamma(g_l), b = gamma(b_l);
         return [r * 255, g * 255, b * 255, outOfBounds];
+    }
+
+    static xyzToRgbUnclamped(x, y, z, illKey) {
+        const matrices = this.getMatrices(illKey);
+        const X = x / 100, Y = y / 100, Z = z / 100;
+
+        let r_l = matrices.toRgb[0][0]*X + matrices.toRgb[0][1]*Y + matrices.toRgb[0][2]*Z;
+        let g_l = matrices.toRgb[1][0]*X + matrices.toRgb[1][1]*Y + matrices.toRgb[1][2]*Z;
+        let b_l = matrices.toRgb[2][0]*X + matrices.toRgb[2][1]*Y + matrices.toRgb[2][2]*Z;
+
+        const gammaUnclamped = v => {
+            const sign = Math.sign(v);
+            const absV = Math.abs(v);
+            return sign * ((absV >= 0.0031308) ? (1.055 * Math.pow(absV, 1/2.4) - 0.055) : (12.92 * absV));
+        };
+
+        return [gammaUnclamped(r_l) * 255, gammaUnclamped(g_l) * 255, gammaUnclamped(b_l) * 255];
     }
 
     static rgbToXyz(r, g, b, illKey) {
@@ -115,18 +131,18 @@ class ColorModel {
         let R = r / 255, G = g / 255, B = b / 255;
         let max = Math.max(R, G, B), min = Math.min(R, G, B), d = max - min;
         let l = (max + min) / 2;
-        let s = d === 0 ? 0 : (l <= 0.5 ? d / (max + min) : d / (2 - max - min));
 
-        if (d < 1e-4) {
-            return [currentH, l * 100, s * 100];
+        if (Math.abs(d) < 0.002) {
+            return [currentH, l * 100, 0]; 
         }
 
+        let s = l <= 0.5 ? d / (max + min) : d / (2 - max - min);
         let h = 0;
         if (max === R) h = 60 * (((G - B) / d) % 6);
         else if (max === G) h = 60 * (((B - R) / d) + 2);
         else if (max === B) h = 60 * (((R - G) / d) + 4);
 
-        if (h < 0) h += 360;
+        h = (h % 360 + 360) % 360;
         return [h, l * 100, s * 100];
     }
 
