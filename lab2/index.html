@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ метаданных графических файлов</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>Анализ метаданных графических файлов</h1>
+        <p>Побайтовый ручной парсинг изображений</p>
+        <p class="formats-list">Поддерживаемые форматы: JPG, GIF, TIF, BMP, PNG, PCX</p>
+    </header>
+
+    <div class="upload-container" id="dropZone">
+        <label class="upload-label">
+            <span>Выберите файлы или папку из проводника</span>
+            <br>
+            <span class="btn-mode">Открыть проводник</span>
+            <input type="file" id="fileInput" webkitdirectory directory multiple>
+        </label>
+    </div>
+
+    <div class="progress-container" id="progressContainer">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-status" id="progressStatus">0 / 0 файлов обработано</div>
+    </div>
+
+    <div class="table-container" id="tableContainer">
+        <table>
+            <thead>
+                <tr>
+                    <th>Имя файла</th>
+                    <th>Формат (Реальный / Расш.)</th>
+                    <th>Размер (px)</th>
+                    <th>DPI</th>
+                    <th>Глубина (bit)</th>
+                    <th>Сжатие</th>
+                    <th>Доп. свойства</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
