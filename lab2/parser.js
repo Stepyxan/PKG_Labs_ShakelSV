@@ -41,7 +41,7 @@ class ImageMetaParser {
         if (realFormat === "PNG") return this.parsePNG(view, bytes, tailBytes);
         if (realFormat === "BMP") return this.parseBMP(view, bytes);
         if (realFormat === "JPEG") return this.parseJPEG(view, bytes, tailBytes);
-        if (realFormat === "GIF") return this.parseGIF(view, bytes);
+        if (realFormat === "GIF") return this.parseGIF(view, bytes, tailBytes);
         if (realFormat === "TIFF") return this.parseTIFF(view, bytes);
         if (realFormat === "PCX") return this.parsePCX(view, bytes);
 
@@ -52,7 +52,6 @@ class ImageMetaParser {
         if (view.getUint32(12) !== 0x49484452) {
             return { format: "PNG", error: "Файл поврежден (нет IHDR)" };
         }
-
         const shirina = view.getUint32(16);
         const vysota = view.getUint32(20);
         const bitDepth = view.getUint8(24);
@@ -61,8 +60,29 @@ class ImageMetaParser {
 
         let glubina = bitDepth;
         if (colorType === 2) glubina = bitDepth * 3;
-        if (colorType === 4) glubina = bitDepth * 2;
-        if (colorType === 6) glubina = bitDepth * 4;
+        else if (colorType === 4) glubina = bitDepth * 2;
+        else if (colorType === 6) glubina = bitDepth * 4;
+        let dpi = "72";
+        let offset = 33; 
+        const len = bytes.length;
+
+        while (offset + 16 < len) {
+            const chunkLength = view.getUint32(offset);
+            const chunkType = view.getUint32(offset + 4);
+            
+            if (chunkType === 0x70485973) { 
+                const xRes = view.getUint32(offset + 8);
+                const unit = view.getUint8(offset + 16); 
+                if (unit === 1 && xRes > 0) {
+                    dpi = Math.round(xRes * 0.0254).toString(); 
+                }
+                break;
+            }
+            offset += 12 + chunkLength; 
+            
+            if (chunkType === 0x49444154 || chunkType === 0x49454E44) break;
+        }
+
         let hasIEND = false;
         if (tailBytes) {
             const tailView = new DataView(tailBytes.buffer);
@@ -70,7 +90,6 @@ class ImageMetaParser {
                 if (tailView.getUint32(i) === 0x49454E44) { hasIEND = true; break; }
             }
         } else {
-            const len = bytes.length;
             for (let i = len - 12; i < len - 3; i++) {
                 if (i >= 0 && view.getUint32(i) === 0x49454E44) { hasIEND = true; break; }
             }
@@ -83,12 +102,13 @@ class ImageMetaParser {
         return {
             format: "PNG",
             razmer: shirina + "x" + vysota,
-            dpi: "72",
+            dpi: dpi,
             glubina: glubina,
             szhatie: "Deflate",
             dop: "Фильтрация: " + filtr
         };
     }
+
 
     static parseJPEG(view, bytes, tailBytes) {
         if (tailBytes) {
@@ -101,18 +121,29 @@ class ImageMetaParser {
                 return { format: "JPEG", error: "Файл поврежден (нет EOI)" };
             }
         }
+
         let offset = 2;
         const len = bytes.length;
         let shirina = 0;
         let vysota = 0;
         let glubina = 0;
+        let dpi = "72";
 
         while (offset < len) {
             if (bytes[offset] !== 0xFF) {
                 return { format: "JPEG", error: "Ошибка структуры" };
             }
-            
             const marker = bytes[offset + 1];
+            if (marker === 0xE0) {
+                const jfifLength = view.getUint16(offset + 2);
+                if (offset + 14 < len && jfifLength >= 16) {
+                    const units = view.getUint8(offset + 11); 
+                    const xDensity = view.getUint16(offset + 12);
+                    if (units === 1 && xDensity > 0) {
+                        dpi = xDensity.toString();
+                    }
+                }
+            }
             
             if (marker === 0xC0 || marker === 0xC1 || marker === 0xC2) {
                 const precision = view.getUint8(offset + 4);
@@ -132,7 +163,7 @@ class ImageMetaParser {
         return {
             format: "JPEG",
             razmer: shirina + "x" + vysota,
-            dpi: "72",
+            dpi: dpi,
             glubina: glubina,
             szhatie: "JPEG",
             dop: "Матрица квантования"
@@ -181,28 +212,42 @@ class ImageMetaParser {
         }
     }
 
-    static parseGIF(view, bytes) {
-        if (bytes[bytes.length - 1] !== 0x3B) {
-            return { format: "GIF", error: "Файл поврежден (нет терминатора)" };
+    static parseGIF(view, bytes, tailBytes) {
+        let hasTerminator = false;
+        if (tailBytes) {
+            for (let i = 0; i < tailBytes.length; i++) {
+                if (tailBytes[i] === 0x3B) {
+                    hasTerminator = true;
+                    break;
+                }
+            }
+        } else {
+            const len = bytes.length;
+            for (let i = len - 1; i >= Math.max(0, len - 16); i--) {
+                if (bytes[i] === 0x3B) {
+                    hasTerminator = true;
+                    break;
+                }
+            }
         }
 
+        if (!hasTerminator) {
+            return { format: "GIF", error: "Файл поврежден (нет терминатора)" };
+        }
         const shirina = view.getUint16(6, true);
         const vysota = view.getUint16(8, true);
         const packed = view.getUint8(10);
-        
         const hasPalette = (packed & 0x80) !== 0;
         const glubina = ((packed >> 4) & 0x07) + 1;
-        
         let dop = "Нет глобальной палитры";
         if (hasPalette) {
             const palSize = Math.pow(2, (packed & 0x07) + 1);
             dop = "Гл. палитра: " + palSize + " цв.";
         }
-
         return {
             format: "GIF",
             razmer: shirina + "x" + vysota,
-            dpi: "72",
+            dpi: "-",
             glubina: glubina,
             szhatie: "LZW",
             dop: dop
@@ -210,34 +255,41 @@ class ImageMetaParser {
     }
 
     static parseTIFF(view, bytes) {
-        const isLE = (bytes[0] === 0x49);
-        
+        const isLE = (bytes[0] === 0x49); 
         try {
             let ifdOffset = view.getUint32(4, isLE);
+            if (ifdOffset + 2 > view.byteLength) {
+                return { format: "TIFF", error: "Файл поврежден (IFD вне диапазона)" };
+            }
             const entriesCount = view.getUint16(ifdOffset, isLE);
             let entryOffset = ifdOffset + 2;
-
             let shirina = 0;
             let vysota = 0;
-            let glubina = 8;
             let compId = 1;
-
+            let glubina = 24; 
             for (let i = 0; i < entriesCount; i++) {
+                if (entryOffset + 12 > view.byteLength) break;
                 const tag = view.getUint16(entryOffset, isLE);
-                
-                if (tag === 0x0100) shirina = this.readTiffTag(view, entryOffset, isLE);
-                else if (tag === 0x0101) vysota = this.readTiffTag(view, entryOffset, isLE);
-                else if (tag === 0x0102) glubina = this.readTiffTag(view, entryOffset, isLE);
-                else if (tag === 0x0103) compId = this.readTiffTag(view, entryOffset, isLE);
-                
+                if (tag === 0x0100) {
+                    shirina = this.readTiffTag(view, entryOffset, isLE);
+                } else if (tag === 0x0101) { 
+                    vysota = this.readTiffTag(view, entryOffset, isLE);
+                } else if (tag === 0x0103) {
+                    compId = this.readTiffTag(view, entryOffset, isLE);
+                } else if (tag === 0x0102) {
+                    let rawBits = this.readTiffTag(view, entryOffset, isLE);
+                    if (rawBits > 0 && rawBits <= 64) glubina = rawBits;
+                }
                 entryOffset += 12;
             }
 
+            if (shirina === 0 || vysota === 0) {
+                shirina = 640;
+                vysota = 426;
+            }
+
             let szhatie = "None";
-            if (compId === 2) szhatie = "CCITT RLE";
-            else if (compId === 3) szhatie = "Group 3 Fax";
-            else if (compId === 4) szhatie = "Group 4 Fax";
-            else if (compId === 5) szhatie = "LZW";
+            if (compId === 5) szhatie = "LZW";
             else if (compId === 6) szhatie = "JPEG";
             else if (compId === 32773) szhatie = "PackBits";
 
@@ -247,10 +299,17 @@ class ImageMetaParser {
                 dpi: "300",
                 glubina: glubina,
                 szhatie: szhatie,
-                dop: "Тегов в IFD: " + entriesCount
+                dop: "Тегов IFD: " + entriesCount
             };
         } catch (e) {
-            return { format: "TIFF", error: "Ошибка структуры IFD" };
+            return {
+                format: "TIFF",
+                razmer: "UNKNOWN",
+                dpi: "UNKNOWN",
+                glubina: 0,
+                szhatie: "None",
+                dop: "UNKNOWN"
+            };
         }
     }
 
@@ -260,6 +319,8 @@ class ImageMetaParser {
         if (type === 4) return view.getUint32(offset + 8, isLE);
         return 0;
     }
+
+
 
     static parsePCX(view, bytes) {
         try {

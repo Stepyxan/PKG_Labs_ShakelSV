@@ -11,8 +11,14 @@ self.onmessage = async function(e) {
             ext = file.name.slice(dotIndex + 1);
         }
 
-        const headSlice = file.slice(0, 65536); 
-        const headBuffer = await headSlice.arrayBuffer();
+        let headBuffer = null;
+
+        if (ext.toLowerCase() === 'tif' || ext.toLowerCase() === 'tiff') {
+            headBuffer = await file.arrayBuffer();
+        } else {
+            const headSlice = file.slice(0, 65536); 
+            headBuffer = await headSlice.arrayBuffer();
+        }
         
         let tailBytes = null;
         if (file.size > 65536) {
