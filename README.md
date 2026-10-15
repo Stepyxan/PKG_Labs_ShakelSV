@@ -3,4 +3,4 @@ PKG Laboratory Solutions Repository
 
 Lab1 hosted resource: [rainbow-pasca-61a052.netlify.app](https://rainbow-pasca-61a052.netlify.app)
 
-Lab2 hosted resourse: https://hilarious-klepon-307a2a.netlify.app
+Lab2 hosted resourse: 
