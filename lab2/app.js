@@ -5,9 +5,16 @@ const progressContainer = document.getElementById('progressContainer');
 const progressFill = document.getElementById('progressFill');
 const progressStatus = document.getElementById('progressStatus');
 
+
+let currentWorker = null;
+
 fileInput.addEventListener('change', (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
+
+    if (currentWorker) {
+        currentWorker.terminate();
+    }
 
     resultsBody.innerHTML = '';
     tableContainer.style.display = 'block';
@@ -15,12 +22,19 @@ fileInput.addEventListener('change', (e) => {
     
     const totalFiles = files.length;
     let processedCount = 0;
+    
+    let currentIndex = 0;
+    const fragment = document.createDocumentFragment();
 
-    const worker = new Worker('worker.js');
+    currentWorker = new Worker('worker.js');
 
-    worker.onmessage = function(event) {
+    currentWorker.onmessage = function(event) {
         const data = event.data;
         const row = document.createElement('tr');
+
+        const tempDiv = document.createElement('div');
+        tempDiv.textContent = data.fileName;
+        const safeFileName = tempDiv.innerHTML;
 
         if (!data.success || data.meta.error) {
             let fmt = "Неизвестно";
@@ -35,7 +49,7 @@ fileInput.addEventListener('change', (e) => {
             }
 
             row.innerHTML = `
-                <td title="${data.fileName}">${data.fileName}</td>
+                <td title="${safeFileName}">${safeFileName}</td>
                 <td>${fmt}</td>
                 <td>-</td>
                 <td>-</td>
@@ -47,7 +61,7 @@ fileInput.addEventListener('change', (e) => {
         } else {
             const m = data.meta;
             row.innerHTML = `
-                <td title="${data.fileName}">${data.fileName}</td>
+                <td title="${safeFileName}">${safeFileName}</td>
                 <td>${m.format}</td>
                 <td>${m.razmer}</td>
                 <td>${m.dpi}</td>
@@ -58,19 +72,28 @@ fileInput.addEventListener('change', (e) => {
             `;
         }
 
-        resultsBody.appendChild(row);
+        fragment.appendChild(row);
         processedCount++;
 
-        const percent = (processedCount / totalFiles) * 100;
-        progressFill.style.width = percent + "%";
-        progressStatus.textContent = processedCount + " / " + totalFiles + " файлов обработано";
+        if (processedCount % 50 === 0 || processedCount === totalFiles) {
+            resultsBody.appendChild(fragment);
+            progressFill.style.width = (processedCount / totalFiles) * 100 + "%";
+            progressStatus.textContent = processedCount + " / " + totalFiles + " файлов обработано";
+        }
 
         if (processedCount === totalFiles) {
-            worker.terminate();
+            currentWorker.terminate();
+        } else {
+            processNext();
         }
     };
 
-    files.forEach((file, index) => {
-        worker.postMessage({ file: file, index: index });
-    });
+    function processNext() {
+        if (currentIndex < totalFiles) {
+            currentWorker.postMessage({ file: files[currentIndex], index: currentIndex });
+            currentIndex++;
+        }
+    }
+
+    processNext();
 });

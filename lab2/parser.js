@@ -62,14 +62,13 @@ class ImageMetaParser {
         if (colorType === 2) glubina = bitDepth * 3;
         else if (colorType === 4) glubina = bitDepth * 2;
         else if (colorType === 6) glubina = bitDepth * 4;
-        let dpi = "72";
+        let dpi = "no_dpi";
         let offset = 33; 
         const len = bytes.length;
 
         while (offset + 16 < len) {
             const chunkLength = view.getUint32(offset);
             const chunkType = view.getUint32(offset + 4);
-            
             if (chunkType === 0x70485973) { 
                 const xRes = view.getUint32(offset + 8);
                 const unit = view.getUint8(offset + 16); 
@@ -79,7 +78,6 @@ class ImageMetaParser {
                 break;
             }
             offset += 12 + chunkLength; 
-            
             if (chunkType === 0x49444154 || chunkType === 0x49454E44) break;
         }
 
@@ -127,7 +125,7 @@ class ImageMetaParser {
         let shirina = 0;
         let vysota = 0;
         let glubina = 0;
-        let dpi = "72";
+        let dpi = "no_dpi";
 
         while (offset < len) {
             if (bytes[offset] !== 0xFF) {
@@ -185,7 +183,7 @@ class ImageMetaParser {
             else if (compId === 3) szhatie = "BI_BITFIELDS";
 
             const hResMeter = view.getInt32(38, true);
-            let dpi = "72";
+            let dpi = "no_dpi";
             if (hResMeter > 0) {
                 dpi = Math.round(hResMeter * 0.0254).toString();
             }
