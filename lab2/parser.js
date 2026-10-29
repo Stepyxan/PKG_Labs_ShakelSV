@@ -1,6 +1,6 @@
 class ImageMetaParser {
     
-    static parse(buffer, rasshirenie, tailBytes) {
+    static parse(buffer, rasshirenie, tailBytes, userWidthCm) {
         const view = new DataView(buffer);
         const bytes = new Uint8Array(buffer);
         const ext = rasshirenie.toLowerCase();
@@ -38,14 +38,28 @@ class ImageMetaParser {
             return { format: realFormat + " / " + ext.toUpperCase(), error: "Подмена расширения" };
         }
 
-        if (realFormat === "PNG") return this.parsePNG(view, bytes, tailBytes);
-        if (realFormat === "BMP") return this.parseBMP(view, bytes);
-        if (realFormat === "JPEG") return this.parseJPEG(view, bytes, tailBytes);
-        if (realFormat === "GIF") return this.parseGIF(view, bytes, tailBytes);
-        if (realFormat === "TIFF") return this.parseTIFF(view, bytes);
-        if (realFormat === "PCX") return this.parsePCX(view, bytes);
+        let result;
+        if (realFormat === "PNG") result = this.parsePNG(view, bytes, tailBytes);
+        else if (realFormat === "BMP") result = this.parseBMP(view, bytes);
+        else if (realFormat === "JPEG") result = this.parseJPEG(view, bytes, tailBytes);
+        else if (realFormat === "GIF") result = this.parseGIF(view, bytes, tailBytes);
+        else if (realFormat === "TIFF") result = this.parseTIFF(view, bytes);
+        else if (realFormat === "PCX") result = this.parsePCX(view, bytes);
+        else return { format: "Неизв. / " + ext.toUpperCase(), error: "Формат не поддерживается" };
 
-        return { format: "Неизв. / " + ext.toUpperCase(), error: "Формат не поддерживается" };
+        if (result && !result.error) {
+            if (result.dpi === "no_dpi") {
+                if (userWidthCm > 0) {
+                    const shirinaPx = parseInt(result.razmer.split('x')[0]);
+                    if (shirinaPx > 0) {
+                        result.dpi = Math.round(shirinaPx / (userWidthCm / 2.54)).toString() + " (расчет)";
+                    }
+                } else {
+                    result.dpi = "72";
+                }
+            }
+        }
+        return result;
     }
 
     static parsePNG(view, bytes, tailBytes) {
@@ -137,8 +151,9 @@ class ImageMetaParser {
                 if (offset + 14 < len && jfifLength >= 16) {
                     const units = view.getUint8(offset + 11); 
                     const xDensity = view.getUint16(offset + 12);
-                    if (units === 1 && xDensity > 0) {
-                        dpi = xDensity.toString();
+                    if (xDensity > 0) {
+                        if (units === 1) dpi = xDensity.toString(); // Дюймы
+                        else if (units === 2) dpi = Math.round(xDensity * 2.54).toString(); // Сантиметры
                     }
                 }
             }
@@ -245,7 +260,7 @@ class ImageMetaParser {
         return {
             format: "GIF",
             razmer: shirina + "x" + vysota,
-            dpi: "-",
+            dpi: "no_dpi",
             glubina: glubina,
             szhatie: "LZW",
             dop: dop
@@ -261,13 +276,17 @@ class ImageMetaParser {
             }
             const entriesCount = view.getUint16(ifdOffset, isLE);
             let entryOffset = ifdOffset + 2;
+            
             let shirina = 0;
             let vysota = 0;
             let compId = 1;
             let glubina = 24; 
+            let dpi = "no_dpi"; // КРИТИЧЕСКИ ВАЖНАЯ ПЕРЕМЕННАЯ
+
             for (let i = 0; i < entriesCount; i++) {
                 if (entryOffset + 12 > view.byteLength) break;
                 const tag = view.getUint16(entryOffset, isLE);
+                
                 if (tag === 0x0100) {
                     shirina = this.readTiffTag(view, entryOffset, isLE);
                 } else if (tag === 0x0101) { 
@@ -277,6 +296,18 @@ class ImageMetaParser {
                 } else if (tag === 0x0102) {
                     let rawBits = this.readTiffTag(view, entryOffset, isLE);
                     if (rawBits > 0 && rawBits <= 64) glubina = rawBits;
+                } else if (tag === 0x011A) {
+                    const type = view.getUint16(entryOffset + 2, isLE);
+                    if (type === 5) {
+                        const dataOffset = view.getUint32(entryOffset + 8, isLE);
+                        if (dataOffset + 8 <= view.byteLength) {
+                            const numerator = view.getUint32(dataOffset, isLE);
+                            const denominator = view.getUint32(dataOffset + 4, isLE);
+                            if (denominator !== 0) {
+                                dpi = Math.round(numerator / denominator).toString();
+                            }
+                        }
+                    }
                 }
                 entryOffset += 12;
             }
@@ -294,7 +325,7 @@ class ImageMetaParser {
             return {
                 format: "TIFF",
                 razmer: shirina + "x" + vysota,
-                dpi: "300",
+                dpi: dpi,
                 glubina: glubina,
                 szhatie: szhatie,
                 dop: "Тегов IFD: " + entriesCount
@@ -302,11 +333,7 @@ class ImageMetaParser {
         } catch (e) {
             return {
                 format: "TIFF",
-                razmer: "UNKNOWN",
-                dpi: "UNKNOWN",
-                glubina: 0,
-                szhatie: "None",
-                dop: "UNKNOWN"
+                error: "Сбой парсинга: " + e.message
             };
         }
     }
@@ -328,6 +355,7 @@ class ImageMetaParser {
             const yMin = view.getUint16(6, true);
             const xMax = view.getUint16(8, true);
             const yMax = view.getUint16(10, true);
+            const hDpi = view.getUint16(12, true);
 
             const shirina = xMax - xMin + 1;
             const vysota = yMax - yMin + 1;
@@ -341,7 +369,7 @@ class ImageMetaParser {
             return {
                 format: "PCX",
                 razmer: shirina + "x" + vysota,
-                dpi: "300",
+                dpi: hDpi > 0 ? hDpi.toString() : "no_dpi",
                 glubina: bpp * planes,
                 szhatie: szhatie,
                 dop: "Планов цвета: " + planes

@@ -3,7 +3,7 @@ self.importScripts('parser.js');
 self.onmessage = async function(e) {
     const file = e.data.file;
     const index = e.data.index;
-    
+    const userWidthCm = e.data.userWidthCm;
     try {
         const dotIndex = file.name.lastIndexOf('.');
         let ext = "";
@@ -27,7 +27,7 @@ self.onmessage = async function(e) {
             tailBytes = new Uint8Array(tailBuffer);
         }
         
-        const meta = ImageMetaParser.parse(headBuffer, ext, tailBytes);
+        const meta = ImageMetaParser.parse(headBuffer, ext, tailBytes, userWidthCm);
         
         self.postMessage({
             success: true,

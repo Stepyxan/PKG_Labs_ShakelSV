@@ -12,6 +12,9 @@ fileInput.addEventListener('change', (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
+    const widthInput = document.getElementById('userWidthCm').value;
+    const userWidthCm = widthInput ? parseFloat(widthInput) : null;
+
     if (currentWorker) {
         currentWorker.terminate();
     }
@@ -88,9 +91,13 @@ fileInput.addEventListener('change', (e) => {
         }
     };
 
-    function processNext() {
+function processNext() {
         if (currentIndex < totalFiles) {
-            currentWorker.postMessage({ file: files[currentIndex], index: currentIndex });
+            currentWorker.postMessage({ 
+                file: files[currentIndex], 
+                index: currentIndex,
+                userWidthCm: userWidthCm
+            });
             currentIndex++;
         }
     }
