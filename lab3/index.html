@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Лабораторная 3: Обработка изображений</title>
+<link rel="stylesheet" href="style.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2><i class="fa-solid fa-image"></i> Обработка изображений</h2>
+            <p>Лабораторная работа 3</p>
+        </div>
+
+        <div class="sidebar-content">
+            <div class="control-group file-upload-group">
+                <label for="upload" class="upload-btn">
+                    <i class="fa-solid fa-upload"></i> Загрузить фото
+                </label>
+                <input type="file" id="upload" accept="image/*" style="display: none;">
+            </div>
+
+            <div class="control-group">
+                <label for="algorithm"><i class="fa-solid fa-filter"></i> Алгоритм:</label>
+                <select id="algorithm" class="modern-select">
+                    <option value="linearContrast">Линейное контрастирование</option>
+                    <option value="bradley">Адаптивная: Брэдли-Рот</option>
+                    <option value="niblack">Локальная: Ниблэк</option>
+                    <option value="sauvola">Локальная: Саувола</option>
+                </select>
+            </div>
+
+            <div class="control-group" id="edgeModeGroup">
+                <label for="edgeMode"><i class="fa-solid fa-border-all"></i> Режим краев:</label>
+                <select id="edgeMode" class="modern-select">
+                    <option value="clamp">Clamp (Дублирование)</option>
+                    <option value="reflect">Reflect (Отражение)</option>
+                </select>
+            </div>
+
+            <div class="divider"></div>
+
+            <div id="params-container">
+            </div>
+
+            <button id="processBtn" class="process-btn" disabled>
+                <i class="fa-solid fa-play"></i> Обработать
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="topbar">
+            <div class="progress-wrapper">
+                <div class="progress-info">
+                    <span class="progress-status"><i class="fa-solid fa-spinner fa-spin" style="display:none;" id="spinner"></i> <span id="progressLabel">Ожидание загрузки...</span></span>
+                    <span class="progress-percent" id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+            </div>
+        </header>
+
+        <div class="workspace">
+            <div class="card image-card">
+                <div class="card-header">
+                    <h3>Оригинал</h3>
+                </div>
+                <div class="card-body">
+                    <div class="canvas-container">
+                        <canvas id="canvasBefore" class="img-canvas"></canvas>
+                        <div class="placeholder" id="placeholderBefore">Нет изображения</div>
+                    </div>
+                    <div class="hist-container">
+                        <canvas id="histBefore" class="hist-canvas" width="256" height="80"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card image-card">
+                <div class="card-header">
+                    <h3>Результат</h3>
+                </div>
+                <div class="card-body">
+                    <div class="canvas-container">
+                        <canvas id="canvasAfter" class="img-canvas"></canvas>
+                        <div class="placeholder" id="placeholderAfter">Ожидание обработки</div>
+                    </div>
+                    <div class="hist-container">
+                        <canvas id="histAfter" class="hist-canvas" width="256" height="80"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="shared.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
