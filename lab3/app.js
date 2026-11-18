@@ -22,9 +22,16 @@ let currentWorker = null;
 
 const algoConfigs = {
     linearContrast: [],
+    brightness: [
+        { id: 'offset', label: 'Смещение яркости', min: -150, max: 150, step: 1, default: 30 }
+    ],
+    invert: [],
+    gamma: [
+        { id: 'gamma', label: 'Показатель гаммы (γ)', min: 0.1, max: 3.0, step: 0.1, default: 1.5 }
+    ],
     bradley: [
         { id: 'windowSize', label: 'Размер окна', min: 3, max: 101, step: 2, default: 15 },
-        { id: 'k', label: 'Смещение (T)', min: 0, max: 50, step: 1, default: 15 }
+        { id: 'k', label: 'Порог отклонения (%)', min: 1, max: 50, step: 1, default: 15 }
     ],
     niblack: [
         { id: 'windowSize', label: 'Размер окна', min: 3, max: 101, step: 2, default: 15 },
@@ -36,11 +43,14 @@ const algoConfigs = {
     ]
 };
 
+const pointOperations = ['linearContrast', 'brightness', 'invert', 'gamma'];
+
 function updateParamsUI() {
     ui.paramsContainer.innerHTML = '';
-    const config = algoConfigs[ui.algoSelect.value] || [];
+    const algo = ui.algoSelect.value;
+    const config = algoConfigs[algo] || [];
     
-    if (ui.algoSelect.value === 'linearContrast') {
+    if (pointOperations.includes(algo)) {
         ui.edgeModeGroup.style.display = 'none';
     } else {
         ui.edgeModeGroup.style.display = 'flex';
@@ -90,7 +100,7 @@ function drawHistogram(imageData, canvas) {
     const hist = new Uint32Array(256);
     let max = 0;
     for (let i = 0; i < imageData.data.length; i += 4) {
-        const lum = Math.round(0.299*imageData.data[i] + 0.587*imageData.data[i+1] + 0.114*imageData.data[i+2]);
+        const lum = Math.round(0.299 * imageData.data[i] + 0.587 * imageData.data[i+1] + 0.114 * imageData.data[i+2]);
         hist[lum]++;
         if (hist[lum] > max) max = hist[lum];
     }

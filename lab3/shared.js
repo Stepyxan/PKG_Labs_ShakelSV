@@ -7,17 +7,25 @@ class ImageBuffer {
     static fromImageData(imgData) {
         return new ImageBuffer(imgData.width, imgData.height, imgData.data);
     }
+    static adjustCoord(val, max, mode) {
+        if (max <= 1) return 0;
+        if (mode === 'clamp') {
+            return Math.max(0, Math.min(val, max - 1));
+        } else if (mode === 'reflect') {
+            while (val < 0 || val >= max) {
+                if (val < 0) val = -val;
+                if (val >= max) val = 2 * max - val - 1;
+            }
+            return val;
+        }
+        return val;
+    }
     _getIndex(x, y) {
         return (y * this.width + x) * 4;
     }
     getPixel(x, y, edgeMode = 'clamp') {
-        if (edgeMode === 'clamp') {
-            x = Math.max(0, Math.min(x, this.width - 1));
-            y = Math.max(0, Math.min(y, this.height - 1));
-        } else if (edgeMode === 'reflect') {
-            if (x < 0) x = -x; else if (x >= this.width) x = 2 * this.width - x - 1;
-            if (y < 0) y = -y; else if (y >= this.height) y = 2 * this.height - y - 1;
-        }
+        x = ImageBuffer.adjustCoord(x, this.width, edgeMode);
+        y = ImageBuffer.adjustCoord(y, this.height, edgeMode);
         const i = this._getIndex(x, y);
         return [this.data[i], this.data[i+1], this.data[i+2], this.data[i+3]];
     }

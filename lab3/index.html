@@ -27,10 +27,17 @@
             <div class="control-group">
                 <label for="algorithm"><i class="fa-solid fa-filter"></i> Алгоритм:</label>
                 <select id="algorithm" class="modern-select">
-                    <option value="linearContrast">Линейное контрастирование</option>
-                    <option value="bradley">Адаптивная: Брэдли-Рот</option>
-                    <option value="niblack">Локальная: Ниблэк</option>
-                    <option value="sauvola">Локальная: Саувола</option>
+                    <optgroup label="Поэлементные операции и контраст">
+                        <option value="linearContrast">Линейное контрастирование</option>
+                        <option value="brightness">Изменение яркости</option>
+                        <option value="invert">Инверсия (Негатив)</option>
+                        <option value="gamma">Гамма-коррекция</option>
+                    </optgroup>
+                    <optgroup label="Локальная и адаптивная бинаризация">
+                        <option value="bradley">Адаптивная: Брэдли-Рот</option>
+                        <option value="niblack">Локальная: Ниблэк</option>
+                        <option value="sauvola">Локальная: Саувола</option>
+                    </optgroup>
                 </select>
             </div>
 

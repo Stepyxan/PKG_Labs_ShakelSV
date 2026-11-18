@@ -10,15 +10,19 @@ class IntegralImage {
         this._compute(buffer, progressCallback);
     }
     _compute(buffer, progressCallback) {
+        const data = buffer.data;
         for (let y = 0; y < this.height; y++) {
             let sum = 0, sqSum = 0;
             for (let x = 0; x < this.width; x++) {
                 const i = (y * this.width + x) * 4;
-                const intensity = 0.299 * buffer.data[i] + 0.587 * buffer.data[i+1] + 0.114 * buffer.data[i+2];
-                sum += intensity; sqSum += intensity * intensity;
-                const index = y * this.width + x, topIndex = (y - 1) * this.width + x;
+                const intensity = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                sum += intensity; 
+                sqSum += intensity * intensity;
+                const index = y * this.width + x;
+                const topIndex = (y - 1) * this.width + x;
                 if (y === 0) {
-                    this.sat[index] = sum; this.sqSat[index] = sqSum;
+                    this.sat[index] = sum; 
+                    this.sqSat[index] = sqSum;
                 } else {
                     this.sat[index] = this.sat[topIndex] + sum;
                     this.sqSat[index] = this.sqSat[topIndex] + sqSum;
@@ -27,23 +31,11 @@ class IntegralImage {
             if (y % 50 === 0 && progressCallback) progressCallback((y / this.height) * 20);
         }
     }
-    
-    _getAdjustedCoord(val, max, mode) {
-        if (mode === 'clamp') {
-            return Math.max(0, Math.min(val, max - 1));
-        } else if (mode === 'reflect') {
-            if (val < 0) return -val;
-            if (val >= max) return 2 * max - val - 1;
-            return val;
-        }
-        return val;
-    }
-
     _getAreaSum(array, x1, y1, x2, y2) {
-        const ax1 = this._getAdjustedCoord(x1, this.width, this.edgeMode);
-        const ay1 = this._getAdjustedCoord(y1, this.height, this.edgeMode);
-        const ax2 = this._getAdjustedCoord(x2, this.width, this.edgeMode);
-        const ay2 = this._getAdjustedCoord(y2, this.height, this.edgeMode);
+        const ax1 = ImageBuffer.adjustCoord(x1, this.width, this.edgeMode);
+        const ay1 = ImageBuffer.adjustCoord(y1, this.height, this.edgeMode);
+        const ax2 = ImageBuffer.adjustCoord(x2, this.width, this.edgeMode);
+        const ay2 = ImageBuffer.adjustCoord(y2, this.height, this.edgeMode);
         
         const minX = Math.min(ax1, ax2);
         const maxX = Math.max(ax1, ax2);
@@ -74,46 +66,130 @@ class IntegralImage {
 
 class Filters {
     static _report(progressCallback, percent) {
-        if(progressCallback) progressCallback(percent);
+        if (progressCallback) progressCallback(percent);
     }
+
     static linearContrast(buffer, params, progress) {
+        const src = buffer.data;
         let min = 255, max = 0;
-        for (let i = 0; i < buffer.data.length; i += 4) {
-            let int = 0.299*buffer.data[i] + 0.587*buffer.data[i+1] + 0.114*buffer.data[i+2];
-            if (int < min) min = int; if (int > max) max = int;
+        for (let i = 0; i < src.length; i += 4) {
+            const lum = 0.299 * src[i] + 0.587 * src[i+1] + 0.114 * src[i+2];
+            if (lum < min) min = lum;
+            if (lum > max) max = lum;
         }
-        if (min >= max) return buffer;
-        const out = buffer.clone();
-        for (let y = 0; y < buffer.height; y++) {
-            for (let x = 0; x < buffer.width; x++) {
-                const [r, g, b, a] = buffer.getPixel(x, y);
-                const scale = (v) => ((v - min) / (max - min)) * 255;
-                out.setPixel(x, y, scale(r), scale(g), scale(b), a);
-            }
-            if (y % 20 === 0) this._report(progress, (y/buffer.height)*100);
-        }
-        return out;
-    }
-    static _applySATThreshold(buffer, params, progress, thresholdCalc) {
-        const out = buffer.clone();
-        const integral = new IntegralImage(buffer, params.edgeMode, progress);
-        const r = Math.floor(params.windowSize / 2);
+        if (min >= max) return buffer.clone();
+
+        const out = new ImageBuffer(buffer.width, buffer.height, new Uint8ClampedArray(src.length));
+        const dst = out.data;
+        const factor = 255 / (max - min);
+
         for (let y = 0; y < buffer.height; y++) {
             for (let x = 0; x < buffer.width; x++) {
                 const i = (y * buffer.width + x) * 4;
-                const int = 0.299*buffer.data[i] + 0.587*buffer.data[i+1] + 0.114*buffer.data[i+2];
-                const stats = integral.getStats(x, y, r);
-                const T = thresholdCalc(stats, params);
-                const val = int >= T ? 255 : 0;
-                out.setPixel(x, y, val, val, val, buffer.data[i+3]);
+                dst[i]   = (src[i]   - min) * factor;
+                dst[i+1] = (src[i+1] - min) * factor;
+                dst[i+2] = (src[i+2] - min) * factor;
+                dst[i+3] = src[i+3];
             }
-            if (y % 20 === 0) this._report(progress, 20 + (y/buffer.height)*80);
+            if (y % 20 === 0) this._report(progress, (y / buffer.height) * 100);
         }
         return out;
     }
-    static bradley(buffer, p, prog) { return this._applySATThreshold(buffer, p, prog, s => s.mean - p.k); }
-    static niblack(buffer, p, prog) { return this._applySATThreshold(buffer, p, prog, s => s.mean + p.k * s.sigma); }
-    static sauvola(buffer, p, prog) { return this._applySATThreshold(buffer, p, prog, s => s.mean * (1 + p.k * (s.sigma/128 - 1))); }
+
+    static brightness(buffer, params, progress) {
+        const src = buffer.data;
+        const out = new ImageBuffer(buffer.width, buffer.height, new Uint8ClampedArray(src.length));
+        const dst = out.data;
+        const offset = params.offset;
+
+        for (let y = 0; y < buffer.height; y++) {
+            for (let x = 0; x < buffer.width; x++) {
+                const i = (y * buffer.width + x) * 4;
+                dst[i]   = src[i]   + offset;
+                dst[i+1] = src[i+1] + offset;
+                dst[i+2] = src[i+2] + offset;
+                dst[i+3] = src[i+3];
+            }
+            if (y % 20 === 0) this._report(progress, (y / buffer.height) * 100);
+        }
+        return out;
+    }
+
+    static invert(buffer, params, progress) {
+        const src = buffer.data;
+        const out = new ImageBuffer(buffer.width, buffer.height, new Uint8ClampedArray(src.length));
+        const dst = out.data;
+
+        for (let y = 0; y < buffer.height; y++) {
+            for (let x = 0; x < buffer.width; x++) {
+                const i = (y * buffer.width + x) * 4;
+                dst[i]   = 255 - src[i];
+                dst[i+1] = 255 - src[i+1];
+                dst[i+2] = 255 - src[i+2];
+                dst[i+3] = src[i+3];
+            }
+            if (y % 20 === 0) this._report(progress, (y / buffer.height) * 100);
+        }
+        return out;
+    }
+
+    static gamma(buffer, params, progress) {
+        const src = buffer.data;
+        const out = new ImageBuffer(buffer.width, buffer.height, new Uint8ClampedArray(src.length));
+        const dst = out.data;
+        const invGamma = 1.0 / params.gamma;
+
+        const lut = new Uint8ClampedArray(256);
+        for (let v = 0; v < 256; v++) {
+            lut[v] = 255 * Math.pow(v / 255, invGamma);
+        }
+
+        for (let y = 0; y < buffer.height; y++) {
+            for (let x = 0; x < buffer.width; x++) {
+                const i = (y * buffer.width + x) * 4;
+                dst[i]   = lut[src[i]];
+                dst[i+1] = lut[src[i+1]];
+                dst[i+2] = lut[src[i+2]];
+                dst[i+3] = src[i+3];
+            }
+            if (y % 20 === 0) this._report(progress, (y / buffer.height) * 100);
+        }
+        return out;
+    }
+
+    static _applySATThreshold(buffer, params, progress, thresholdCalc) {
+        const src = buffer.data;
+        const out = new ImageBuffer(buffer.width, buffer.height, new Uint8ClampedArray(src.length));
+        const dst = out.data;
+        const integral = new IntegralImage(buffer, params.edgeMode, progress);
+        const r = Math.floor(params.windowSize / 2);
+
+        for (let y = 0; y < buffer.height; y++) {
+            for (let x = 0; x < buffer.width; x++) {
+                const i = (y * buffer.width + x) * 4;
+                const intensity = 0.299 * src[i] + 0.587 * src[i+1] + 0.114 * src[i+2];
+                const stats = integral.getStats(x, y, r);
+                const T = thresholdCalc(stats, params);
+                const val = intensity >= T ? 255 : 0;
+                dst[i]   = val;
+                dst[i+1] = val;
+                dst[i+2] = val;
+                dst[i+3] = src[i+3];
+            }
+            if (y % 20 === 0) this._report(progress, 20 + (y / buffer.height) * 80);
+        }
+        return out;
+    }
+
+    static bradley(buffer, p, prog) { 
+        return this._applySATThreshold(buffer, p, prog, s => s.mean * (1 - p.k / 100)); 
+    }
+    static niblack(buffer, p, prog) { 
+        return this._applySATThreshold(buffer, p, prog, s => s.mean + p.k * s.sigma); 
+    }
+    static sauvola(buffer, p, prog) { 
+        return this._applySATThreshold(buffer, p, prog, s => s.mean * (1 + p.k * (s.sigma / 128 - 1))); 
+    }
 }
 
 onmessage = function(e) {
