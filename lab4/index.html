@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ЛР №4 — Базовые растровые алгоритмы</title>
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="VirtualGrid.js"></script>
+  <script defer src="RasterEngine.js"></script>
+  <script defer src="GridPainter.js"></script>
+  <script defer src="BenchmarkRunner.js"></script>
+  <script defer src="ChartRenderer.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Лабораторная работа №4: Базовые растровые алгоритмы</h1>
+      <p class="subtitle">
+        Изолированный виртуальный растр (<code>VirtualGrid</code>) • 8 октантов • Сглаживание Ву • Кастл–Питвей • Бенчмарк 100 000+
+      </p>
+    </div>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="visualizer">Визуализация и трассировка</button>
+      <button class="tab-btn" data-tab="benchmark">Бенчмарк производительности</button>
+    </nav>
+  </header>
+
+  <main id="tab-visualizer" class="tab-panel active">
+    <aside class="control-panel">
+      <section class="card">
+        <h2>Алгоритм</h2>
+        <select id="algo-select">
+          <option value="step">1. Пошаговый алгоритм (отрезок)</option>
+          <option value="dda">2. Алгоритм ЦДА / DDA (отрезок)</option>
+          <option value="bresenham" selected>3. Алгоритм Брезенхема (отрезок)</option>
+          <option value="wu">4. Алгоритм Ву / Anti-Aliasing (отрезок)</option>
+          <option value="castleLine">5. Алгоритм Кастла–Питвея (отрезок)</option>
+          <option value="circle">6. Алгоритм Брезенхема (окружность)</option>
+          <option value="ellipse">7. Алгоритм Питвея (коника / эллипс)</option>
+        </select>
+        <p id="algo-desc" class="hint"></p>
+      </section>
+
+      <section class="card">
+        <h2>Параметры примитива</h2>
+        <div id="line-inputs" class="input-grid">
+          <label>X₀ <input type="number" id="x0" value="-10" step="1" /></label>
+          <label>Y₀ <input type="number" id="y0" value="-4" step="1" /></label>
+          <label>X₁ <input type="number" id="x1" value="12" step="1" /></label>
+          <label>Y₁ <input type="number" id="y1" value="7" step="1" /></label>
+        </div>
+
+        <div id="circle-inputs" class="input-grid hidden">
+          <label>Центр X <input type="number" id="cx" value="0" step="1" /></label>
+          <label>Центр Y <input type="number" id="cy" value="0" step="1" /></label>
+          <label>Радиус R <input type="number" id="radius" value="10" min="0" max="45" step="1" /></label>
+        </div>
+
+        <div id="ellipse-inputs" class="input-grid hidden">
+          <label>Центр X <input type="number" id="ex" value="0" step="1" /></label>
+          <label>Центр Y <input type="number" id="ey" value="0" step="1" /></label>
+          <label>Полуось Rx <input type="number" id="rx" value="14" min="0" max="45" step="1" /></label>
+          <label>Полуось Ry <input type="number" id="ry" value="8" min="0" max="45" step="1" /></label>
+        </div>
+
+        <div class="btn-row">
+          <button id="btn-draw" class="primary">Растеризовать</button>
+          <button id="btn-octants" title="Построить веер во всех 8 октантах">Тест 8 октантов</button>
+          <button id="btn-clear">Очистить</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Сетка и отображение</h2>
+        <label class="range-label">
+          Масштаб (px/ячейку): <strong id="zoom-val">24</strong>
+          <input type="range" id="zoom-slider" min="8" max="48" value="24" />
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="chk-ideal" checked />
+          Показать идеальный вектор (эталон)
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="chk-accumulate" />
+          Накапливать на растре (не очищать)
+        </label>
+        <div class="coord-note">
+          <strong>Привязка координат:</strong> целочисленный пиксель <code>(x, y)</code> занимает
+          единичную ячейку <code>[x, x+1) × [y, y+1)</code> с центром в <code>(x+0.5, y+0.5)</code>.
+          Кликните дважды по холсту, чтобы задать примитив мышью.
+        </div>
+      </section>
+
+      <section class="card stats-card">
+        <h2>Метрики последнего запуска</h2>
+        <div class="stats-grid">
+          <div><span>Закрашено пикселей:</span> <strong id="stat-pixels">0</strong></div>
+          <div><span>Время (чистый растр):</span> <strong id="stat-time">0.000 мс</strong></div>
+          <div><span>Курсор (x, y):</span> <strong id="stat-cursor">—</strong></div>
+        </div>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <div class="canvas-wrapper">
+        <canvas id="raster-canvas"></canvas>
+      </div>
+
+      <section class="card trace-card">
+        <div class="trace-header">
+          <h2>Сопроводительные вычисления (пошаговая трассировка)</h2>
+          <span id="trace-summary" class="badge">0 шагов</span>
+        </div>
+        <div class="table-scroll">
+          <table id="trace-table">
+            <thead>
+              <tr>
+                <th>Шаг</th>
+                <th>Координаты (x, y)</th>
+                <th>Интенсивность (α)</th>
+                <th>Промежуточные значения</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <main id="tab-benchmark" class="tab-panel">
+    <section class="card bench-controls">
+      <div class="bench-header">
+        <div>
+          <h2>Стресс-тестирование (чистый виртуальный растр без UI)</h2>
+          <p class="hint">
+            Генерируется «веер» из 100 000 случайных отрезков во всех 8 октантах и 50 000 окружностей.
+            Замеры выполняются через <code>performance.now()</code>.
+          </p>
+        </div>
+        <div class="bench-actions">
+          <label>Отрезков: <input type="number" id="bench-lines" value="100000" min="10000" max="300000" step="10000" /></label>
+          <label>Окружностей: <input type="number" id="bench-circles" value="50000" min="5000" max="150000" step="5000" /></label>
+          <button id="btn-run-bench" class="primary">Запустить полный бенчмарк</button>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div id="bench-progress" class="progress-bar"></div>
+      </div>
+      <p id="bench-status" class="hint">Готов к запуску.</p>
+    </section>
+
+    <section class="bench-results-grid">
+      <div class="card">
+        <h3>Сводная таблица (100 000 отрезков / 50 000 окружностей)</h3>
+        <table id="bench-table">
+          <thead>
+            <tr>
+              <th>Алгоритм</th>
+              <th>Примитивов</th>
+              <th>Время (мс)</th>
+              <th>Относит. Брезенхема</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" class="muted">Запустите бенчмарк для получения результатов</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>Аналитический вывод: почему ЦДА медленнее Брезенхема</h3>
+        <ul class="analysis-list">
+          <li><strong>Арифметика:</strong> ЦДА на каждом шаге выполняет сложение вещественных чисел (<code>float64</code>) и операцию округления <code>Math.round()</code>; Брезенхем использует только целочисленные сложения/вычитания и битовый сдвиг <code>&lt;&lt; 1</code>.</li>
+          <li><strong>Инициализация:</strong> ЦДА требует 2 операции вещественного деления на каждый отрезок (<code>dx/steps</code>, <code>dy/steps</code>).</li>
+          <li><strong>Алгоритм Ву:</strong> медленнее Брезенхема из-за записи 2 пикселей на шаг и вычисления дробной интенсивности (<code>fpart</code>/<code>rfpart</code>).</li>
+          <li><strong>Кастл–Питвей:</strong> целочисленный алгоритм без дробей, однако накладные расходы на конкатенацию строк в JS зависят от числа шагов алгоритма Евклида.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="charts-grid">
+      <div class="card">
+        <h3>График 1: Время (мс) от количества примитивов N</h3>
+        <canvas id="chart-count" width="600" height="340"></canvas>
+      </div>
+      <div class="card">
+        <h3>График 2: Время (мс) от длины отрезка L (20 000 отрезков)</h3>
+        <canvas id="chart-length" width="600" height="340"></canvas>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
