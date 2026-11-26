@@ -77,14 +77,20 @@ class ChartRenderer {
     });
 
     let lx = pad.left;
+    let ly = 12;
     ctx.font = '11px system-ui';
     ctx.textAlign = 'left';
     series.forEach((s) => {
+      const itemW = ctx.measureText(s.name).width + 26;
+      if (lx + itemW > w - pad.right) {
+        lx = pad.left;
+        ly += 16;
+      }
       ctx.fillStyle = s.color;
-      ctx.fillRect(lx, 12, 10, 10);
+      ctx.fillRect(lx, ly, 10, 10);
       ctx.fillStyle = '#0f172a';
-      ctx.fillText(s.name, lx + 14, 21);
-      lx += ctx.measureText(s.name).width + 26;
+      ctx.fillText(s.name, lx + 14, ly + 9);
+      lx += itemW;
     });
   }
 }

@@ -197,12 +197,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   algoSelect.addEventListener('change', () => {
+    pendingFirstPoint = null;
     updateInputVisibility();
     rasterizeCurrent();
   });
 
   document.getElementById('btn-draw').addEventListener('click', rasterizeCurrent);
   document.getElementById('btn-clear').addEventListener('click', () => {
+    pendingFirstPoint = null;
     grid.clear();
     painter.idealOverlay = null;
     statPixels.textContent = '0';
