@@ -7,4 +7,4 @@ Lab2 hosted resourse: [https://soft-puppy-884b31.netlify.app](https://loquacious
 
 Lab3 hosted resourse: [https://graceful-tapioca-04e704.netlify.app]
 
-Lab4 hosted resource: https://mellow-khapse-4d2e6b.netlify.app
+Lab4 hosted resource: 
